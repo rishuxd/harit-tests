@@ -15,8 +15,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-describe.skip("Buyer Registration", () => {
+describe("Buyer Registration", () => {
   test("Registration fails if required fields are missing", async () => {
+    // 'category' and 'otp' are not provided
     const response = await apiClient.post(`/buyer/register`, {
       mobNum: "9876543210",
       email: "test@example.com",
@@ -24,11 +25,13 @@ describe.skip("Buyer Registration", () => {
       repwd: "Abc@1234",
     });
 
+    // Assuming validateFields throws error with message "All fields are required"
     expect(response.status).toBe(400);
     expect(response.data.message).toBe("All fields are required");
   });
 
   test("Registration fails if OTP is expired", async () => {
+    // In this case, no OTP record exists for the provided mobile number
     const response = await apiClient.post(`/buyer/register`, {
       category: "buyer",
       mobNum: "9876543210",
@@ -59,9 +62,14 @@ describe.skip("Buyer Registration", () => {
   });
 
   test.skip("Registration succeeds with valid input", async () => {
-    await apiClient.post(`buyer/registration-otp`, {
-      mobNum: "9876543210", // Write your own number
+    // Simulate OTP generation: Ensure that a valid OTP record exists for this mobile number.
+    // This may involve calling an endpoint (e.g., /buyer/registration-otp) or directly seeding the DB.
+    await apiClient.post(`/buyer/registration-otp`, {
+      mobNum: "9876543210",
     });
+
+    // Assume that the generated/seeded OTP is "1234"
+    const validOtp = "1234";
 
     const response = await apiClient.post(`/buyer/register`, {
       category: "buyer",
@@ -69,7 +77,7 @@ describe.skip("Buyer Registration", () => {
       email: "test@example.com",
       pwd: "Abc@1234",
       repwd: "Abc@1234",
-      otp: "1234", // Write the otp received
+      otp: validOtp,
     });
 
     expect(response.status).toBe(200);
