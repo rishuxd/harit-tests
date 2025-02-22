@@ -130,6 +130,141 @@ describe.skip("Buyer Login", () => {
   });
 });
 
+describe.skip("Entity Single Setup", () => {
+  const validRequestBody = {
+    entityName: "Test FPO",
+    fpoType: "Producer Company",
+    panNumber: "ABCDE1234F",
+    gstNumber: "22AAAAA0000A1Z5",
+    authName: "John Doe",
+    authContact: "9876543210",
+    village: "Test Village",
+    district: "Test District",
+    state: "Test State",
+    pincode: "123456",
+    block: "Test Block",
+    authPanNumber: "FGHIJ5678K",
+    authEmail: "john@example.com",
+    accountHolderName: "John Doe",
+    accountNumber: "1234567890",
+    confirmAccountNumber: "1234567890",
+    ifscCode: "ABCD0123456",
+    declaration: true,
+    termsAndConditions: true,
+  };
+
+  test("Setup fails if required fields are missing", async () => {
+    const response = await apiClient.post("/buyer/registersingle", {
+      ...validRequestBody,
+      entityName: undefined,
+      authName: undefined,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.data.message).toBe("All fields are required");
+  });
+
+  test("Setup fails if account numbers don't match", async () => {
+    const response = await apiClient.post("/buyer/registersingle", {
+      ...validRequestBody,
+      confirmAccountNumber: "0987654321",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.data.message).toBe("Account number does not match");
+  });
+
+  test("Setup fails if entity is not found", async () => {
+    Entity.findOne = jest.fn().mockResolvedValue(null);
+
+    const response = await apiClient.post(
+      "/buyer/registersingle",
+      validRequestBody
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.data.message).toBe("Entity not found");
+  });
+
+  test("Setup validates PAN for non-farmer entities", async () => {
+    Entity.findOne = jest.fn().mockResolvedValue({
+      Category: "Company",
+    });
+
+    const response = await apiClient.post("/buyer/registersingle", {
+      ...validRequestBody,
+      panNumber: undefined,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.data.message).toBe("All fields are required");
+  });
+
+  test("Setup links existing seller if PAN matches", async () => {
+    const mockSeller = {
+      _id: "seller123",
+    };
+
+    Seller.findOne = jest.fn().mockResolvedValue(mockSeller);
+    Entity.findOne = jest.fn().mockResolvedValue({
+      Category: "Company",
+      _id: "entity123",
+    });
+    Entity.findOneAndUpdate = jest.fn().mockResolvedValue({
+      ...validRequestBody,
+      SellerLink: mockSeller._id,
+    });
+
+    const response = await apiClient.post(
+      "/buyer/registersingle",
+      validRequestBody
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data.data.SellerLink).toBe(mockSeller._id);
+  });
+
+  test("Setup succeeds with valid data", async () => {
+    Entity.findOne = jest.fn().mockResolvedValue({
+      Category: "Company",
+      _id: "entity123",
+    });
+    Entity.findOneAndUpdate = jest.fn().mockResolvedValue({
+      ...validRequestBody,
+      _id: "entity123",
+    });
+
+    const response = await apiClient.post(
+      "/buyer/registersingle",
+      validRequestBody
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.data.message).toBe("Profile updated");
+    expect(response.data.data).toBeDefined();
+    expect(response.data.data.Password).toBeUndefined();
+    expect(response.data.data.refreshToken).toBeUndefined();
+  });
+
+  test("Setup fails with server error during update", async () => {
+    Entity.findOne = jest.fn().mockResolvedValue({
+      Category: "Company",
+      _id: "entity123",
+    });
+    Entity.findOneAndUpdate = jest
+      .fn()
+      .mockRejectedValue(new Error("Database error"));
+
+    const response = await apiClient.post(
+      "/buyer/registersingle",
+      validRequestBody
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.data.message).toBe("Profile creation failed");
+  });
+});
+
 // describe("Feedback API", () => {
 //   beforeAll(async () => {
 //     await apiClient.post(`/buyer/login`, {
